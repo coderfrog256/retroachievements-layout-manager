@@ -9,7 +9,9 @@ namespace Retro_Achievement_Tracker.Models
     public partial class GameInfo : IComparable<GameInfo>
     {
         public long Id { get; set; }
+        public long? Parent { get; set; }
         public string Title { get; set; }
+        public List<GameInfo> Children { get; set; }
         private long _consoleId;
         public long ConsoleId
         {

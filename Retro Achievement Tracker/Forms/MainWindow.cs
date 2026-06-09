@@ -13,6 +13,7 @@ using FontFamily = System.Drawing.FontFamily;
 using File = System.IO.File;
 using System.Globalization;
 using Newtonsoft.Json;
+using System.Threading.Tasks;
 
 namespace Retro_Achievement_Tracker
 {
@@ -247,7 +248,7 @@ namespace Retro_Achievement_Tracker
 
                     if (UserSummary != null && UserSummary.LastGameID > 0)
                     {
-                        List<GameInfo> previouslyPlayed = await RetroAchievementsAPIClient.GetRecentlyPlayedGames();
+                        List<GameInfo> previouslyPlayed = AggregatePreviouslyPlayed(await RetroAchievementsAPIClient.GetRecentlyPlayedGames());
 
                         if (previouslyPlayed.Count > 0)
                         {
@@ -259,6 +260,10 @@ namespace Retro_Achievement_Tracker
 
                                 UpdateActivePollingLabel(Constants.RETRO_ACHIEVEMENTS_LABEL_MSG_UPDATING_GAME_INFO);
                                 GameInfoAndProgress = await RetroAchievementsAPIClient.GetGameInfoAndProgress(previouslyPlayed[0].Id);
+                                foreach (var child in previouslyPlayed[0].Children)
+                                {
+                                    await InjectChildAchievements(child, GameInfoAndProgress);
+                                }
 
                                 if (UpdateGameProgress(sameGame))
                                 {
@@ -299,6 +304,72 @@ namespace Retro_Achievement_Tracker
                     StartTimer();
                 else
                     StopButton_Click(null, null);
+            }
+        }
+
+        // Hack for weird subset behavior on some games. The RA API has fake games for subsets, but the "currently playing" is sometimes the main game.
+        // There is sometimes a "ParentGameID" returned, however not all the time (???).
+        // To work around with this ugliness, we look at the last 10 games, and associate the root game to its subsets here.
+        // This association is done via ParentGameID if present, or via dumb console+title-prefix matching.
+        // In a perfect world, the RA API would just list the subsets you've enabled in the root game. But alas.
+        private List<GameInfo> AggregatePreviouslyPlayed(List<GameInfo> previouslyPlayed)
+        {
+            List<GameInfo> newPlayed = previouslyPlayed.Where(g => g.Parent == null && !g.Title.Contains("[Subset")).ToList();
+            foreach (var game in previouslyPlayed)
+            {
+                var suffixStart = game.Title.LastIndexOf("[Subset");
+                // Match by explicit parentId
+                if (game.Parent != null)
+                {
+                    // Find if any root games in newPlayed match Parent, add to list of children. 
+                    // Otherwise add this game to newPlayed
+                    var parent = newPlayed.Find(m => m.Id == game.Parent);
+                    if (parent != null)
+                    {
+                        parent.Children.Add(game);
+                        continue;
+                    }
+                }
+                else if (suffixStart > 0)
+                {
+                    var rootName = game.Title.Substring(0, suffixStart);
+                    var parent = newPlayed.Find(m => m.Title.Trim() == rootName.Trim() && m.ConsoleId == game.ConsoleId);
+                    if (parent != null)
+                    {
+                        parent.Children.Add(game);
+                        continue;
+                    }
+                    // No match. Just add the subset and hope for the best (old behavior)
+                    newPlayed.Add(game);
+                }
+            }
+            return newPlayed;
+        }
+
+        // In order to get the achivement progress for subsets, we need to look up each child subset's psuedo-game, and push it into the root game.
+        // Probably should be in a different class, but there doesn't seem to be a "Service" layer for this app.
+        // Whatever. Just do it in the GUI layer.
+        private async Task InjectChildAchievements(GameInfo child, GameInfo progress)
+        {
+            var childProgress = await RetroAchievementsAPIClient.GetGameInfoAndProgress(child.Id);
+            if (childProgress != null)
+            {
+                // At this point the ParentGameID appears to always be populated, so we can do a real sanity check.
+                // Wouldn't want to inject achievements if the titles just happened to match...
+                if(childProgress.Parent != null && childProgress.Parent != progress.Id)
+                {
+                    //Oops. Unnecessary network call.
+                    return;
+                }
+
+                foreach (var cheevo in childProgress.Achievements)
+                {
+                    // Avoid dupes, just in case RA someday gets their shit together and bundles subsets with the root.
+                    if (progress.Achievements.Find(c=>c.Id == cheevo.Id) == null)
+                    {
+                        progress.Achievements.Add(cheevo);
+                    }
+                }
             }
         }
 

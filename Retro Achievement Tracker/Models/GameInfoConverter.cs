@@ -23,11 +23,17 @@
                 GameInfo = (GameInfo)existingValue;
             }
 
+            if (GameInfo.Children == null)
+            {
+                GameInfo.Children = new List<GameInfo>();
+            }
+
             if (reader.TokenType == JsonToken.StartObject)
             {
                 JObject item = JObject.Load(reader);
 
                 JToken ID = item["ID"];
+                JToken Parent = item["ParentGameID"];
                 JToken GameID = item["GameID"];
                 JToken Title = item["Title"];
                 JToken ConsoleID = item["ConsoleID"];
@@ -94,6 +100,15 @@
                 if (ID != null)
                 {
                     GameInfo.Id = Convert.ToInt32(ID);
+                }
+
+                if (Parent != null)
+                {
+                    try
+                    {
+                        GameInfo.Parent = Convert.ToInt32(Parent);
+                    }
+                    catch { }
                 }
 
                 if (GameID != null)
