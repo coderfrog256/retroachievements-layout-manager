@@ -573,12 +573,13 @@ namespace Retro_Achievement_Tracker
             gameInfoGenreLabel.Text = GameInfoAndProgress.Genre;
             gameInfoReleasedLabel.Text = GameInfoAndProgress.Released;
 
-            GameInfoController.Instance.SetTitleValue(GameInfoAndProgress.Title);
-            GameInfoController.Instance.SetDeveloperValue(GameInfoAndProgress.Developer);
-            GameInfoController.Instance.SetPublisherValue(GameInfoAndProgress.Publisher);
-            GameInfoController.Instance.SetGenreValue(GameInfoAndProgress.Genre);
-            GameInfoController.Instance.SetConsoleValue(GameInfoAndProgress.ConsoleName);
-            GameInfoController.Instance.SetReleaseDateValue(GameInfoAndProgress.Released);
+            var setInfo = SubsetController.Instance.GetSelectedSet(GameInfoAndProgress);
+            GameInfoController.Instance.SetTitleValue(setInfo.Title);
+            GameInfoController.Instance.SetDeveloperValue(setInfo.Developer);
+            GameInfoController.Instance.SetPublisherValue(setInfo.Publisher);
+            GameInfoController.Instance.SetGenreValue(setInfo.Genre);
+            GameInfoController.Instance.SetConsoleValue(setInfo.ConsoleName);
+            GameInfoController.Instance.SetReleaseDateValue(setInfo.Released);
 
             GameProgressController.Instance.SetGameAchievements(GameInfoAndProgress.AchievementsEarned.ToString(), GameInfoAndProgress.Achievements == null ? "0" : GameInfoAndProgress.Achievements.Count.ToString());
             GameProgressController.Instance.SetGamePoints(GameInfoAndProgress.GamePointsEarned.ToString(), GameInfoAndProgress.GamePointsPossible.ToString());

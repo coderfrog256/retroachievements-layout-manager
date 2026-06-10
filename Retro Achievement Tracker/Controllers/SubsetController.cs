@@ -18,6 +18,22 @@ namespace Retro_Achievement_Tracker.Controllers
         //TODO(FROG): Persist this!
         private readonly Dictionary<long, bool> _excludedSubsets = new Dictionary<long, bool>();
 
+        public GameInfo GetSelectedSet(GameInfo gameInfoAndProgress)
+        {
+            // If the game is excluded and only one subset is included, return that subset.
+            // Otherwise return the game.
+            if(IsGameExcluded(gameInfoAndProgress))
+            {
+                var included = gameInfoAndProgress.Children
+                    .Where(c=>!IsGameExcluded(c))
+                    .ToList();
+                if(included.Count == 1)
+                {
+                    return included[0];
+                }
+            }
+            return gameInfoAndProgress;
+        }
 
         // The v1 API has no indicator for if a game has subsets.
         // To work around this, we look at the game history, and associate the root game to possible subsets.
