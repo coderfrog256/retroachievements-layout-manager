@@ -8,7 +8,7 @@
         public static readonly string RETRO_ACHIEVEMENTS_PROFILE_PIC_URL = "https://retroachievements.org/UserPic/{0}.png";
 
         public static readonly string RETRO_ACHIEVEMENTS_API_GET_USER = "/API/API_GetUserSummary.php?z={0}&y={1}&u={2}&g=1&a=1";
-        public static readonly string RETRO_ACHIEVEMENTS_API_GET_RECENTLY_PLAYED = "/API/API_GetUserRecentlyPlayedGames.php?z={0}&y={1}&u={2}&c=10";
+        public static readonly string RETRO_ACHIEVEMENTS_API_GET_RECENTLY_PLAYED = "/API/API_GetUserRecentlyPlayedGames.php?z={0}&y={1}&u={2}&c={3}";
         public static readonly string RETRO_ACHIEVEMENTS_API_GET_RECENT_ACHIEVEMENTS = "/API/API_GetUserRecentAchievements.php?z={0}&y={1}&u={2}&m=1";
         public static readonly string RETRO_ACHIEVEMENTS_API_GET_GAME = "/API/API_GetGameInfoAndUserProgress.php?z={0}&y={1}&u={2}&g={3}";
         public static readonly string RETRO_ACHIEVEMENTS_API_GET_GAME_EXTENDED = "/API/API_GetGameExtended.php?&u={0}&y={1}&i={2}";

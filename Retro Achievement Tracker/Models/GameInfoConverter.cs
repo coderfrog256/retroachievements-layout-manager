@@ -116,7 +116,7 @@
                     GameInfo.Id = Convert.ToInt32(GameID);
                 }
 
-                if (LastPlayed != null)
+                if (LastPlayed != null && LastPlayed.ToString().Length > 0)
                 {
                     GameInfo.LastPlayed = DateTime.Parse(LastPlayed.ToString());
                 }

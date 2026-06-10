@@ -18,10 +18,38 @@ namespace Retro_Achievement_Tracker.Controllers
         //TODO(FROG): Persist this!
         private readonly Dictionary<long, bool> _excludedSubsets = new Dictionary<long, bool>();
 
+
+        // The v1 API has no indicator for if a game has subsets.
+        // To work around this, we look at the game history, and associate the root game to possible subsets.
+        // This association is done console+title-prefix matching.
+        public bool HandleUntrackedSubsets(List<GameInfo> previouslyPlayed)
+        {
+            var newSubsetTracked = false;
+            foreach (var game in previouslyPlayed)
+            {
+                var suffixStart = game.Title.LastIndexOf("[Subset");
+                if (suffixStart > 0)
+                {
+                    var rootName = game.Title.Substring(0, suffixStart);
+                    var parent = previouslyPlayed.Find(m => m.Title.Trim() == rootName.Trim() && m.ConsoleId == game.ConsoleId);
+                    if (parent != null)
+                    {
+                        if (!_suspectedGameAssociations.TryGetValue(parent.Id, out var children))
+                        {
+                            children = new HashSet<long>();
+                            _suspectedGameAssociations[parent.Id] = children;
+                        }
+                        newSubsetTracked |= children.Add(game.Id);
+                    }
+                }
+            }
+            return newSubsetTracked;
+        }
+
         public async Task HandleSubsetProgress(GameInfo rootGame, List<GameInfo> previouslyPlayed)
         {
             await TrackKnownSubsets(rootGame);
-            TrackSuspectedSubsets(previouslyPlayed);
+            HandleUntrackedSubsets(previouslyPlayed);
             if (IsGameExcluded(rootGame))
             {
                 // Special case. User has excluded the base set, wipe the achivement list, we'll just add the subsets.
@@ -95,7 +123,7 @@ namespace Retro_Achievement_Tracker.Controllers
             newPicBox.Margin = new Padding(5);
 
             Label newLabel = new Label();
-            newLabel.Text = "Base Set";
+            newLabel.Text = gameInfo.Title;
             newLabel.ForeColor = Color.White;
             newLabel.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             newLabel.Dock = DockStyle.Fill;
@@ -155,31 +183,6 @@ namespace Retro_Achievement_Tracker.Controllers
             else
             {
                 enabledChecks.ForEach(c => c.Enabled = true);
-            }
-        }
-
-        // The v1 API has no indicator for if a game has subsets.
-        // To work around this, we look at the game history, and associate the root game to possible subsets.
-        // This association is done console+title-prefix matching.
-        private void TrackSuspectedSubsets(List<GameInfo> previouslyPlayed)
-        {
-            foreach (var game in previouslyPlayed)
-            {
-                var suffixStart = game.Title.LastIndexOf("[Subset");
-                if (suffixStart > 0)
-                {
-                    var rootName = game.Title.Substring(0, suffixStart);
-                    var parent = previouslyPlayed.Find(m => m.Title.Trim() == rootName.Trim() && m.ConsoleId == game.ConsoleId);
-                    if (parent != null)
-                    {
-                        if(!_suspectedGameAssociations.TryGetValue(parent.Id, out var children))
-                        {
-                            children = new HashSet<long>();
-                            _suspectedGameAssociations[parent.Id] = children;
-                        }
-                        children.Add(game.Id);
-                    }
-                }
             }
         }
 

@@ -28,6 +28,7 @@ namespace Retro_Achievement_Tracker
         private int UserAndGameTimerCounter;
         private int MaxCheevoCount = 0;
         private bool NeedsRerender = false;
+        private bool FetchMoreHistory = true;
 
         private UserSummary UserSummary;
         private GameInfo GameInfoAndProgress;
@@ -249,13 +250,16 @@ namespace Retro_Achievement_Tracker
 
                     if (UserSummary != null && UserSummary.LastGameID > 0)
                     {
-                        List<GameInfo> previouslyPlayed = await RetroAchievementsAPIClient.GetRecentlyPlayedGames();
+                        List<GameInfo> previouslyPlayed = await RetroAchievementsAPIClient.GetRecentlyPlayedGames(FetchMoreHistory);
+                        FetchMoreHistory = false;
 
                         if (previouslyPlayed.Count > 0)
                         {
                             List<Achievement> recentlyUnlockedAchievements = await RetroAchievementsAPIClient.GetRecentAchievements();
 
-                            if (NeedsRerender || GameInfoAndProgress == null || !previouslyPlayed[0].Id.Equals(GameInfoAndProgress.Id) || recentlyUnlockedAchievements.Count(x => LockedAchievements.Contains(x)) > 0)
+                            if (NeedsRerender || GameInfoAndProgress == null || !previouslyPlayed[0].Id.Equals(GameInfoAndProgress.Id)
+                                || SubsetController.Instance.HandleUntrackedSubsets(previouslyPlayed)
+                                || recentlyUnlockedAchievements.Count(x => LockedAchievements.Contains(x)) > 0)
                             {
                                 bool sameGame = GameInfoAndProgress != null && previouslyPlayed[0].Id.Equals(GameInfoAndProgress.Id);
 
@@ -373,6 +377,7 @@ namespace Retro_Achievement_Tracker
                     triggeredUpdate = true;
 
                     SubsetController.Instance.PopulateSubsetTable(GameInfoAndProgress, subsetLayoutTable, ForceRerender);
+                    FetchMoreHistory = true;
                 }
 
                 if (GameInfoAndProgress.Achievements != null && GameInfoAndProgress.Achievements.Count > 0 && (needsUpdate || NeedsRerender))
@@ -675,6 +680,7 @@ namespace Retro_Achievement_Tracker
         private void StartButton_Click(object sender, EventArgs e)
         {
             IsStarting = true;
+            FetchMoreHistory = true;
 
             RetroAchievementsAPIClient = new RetroAchievementAPIClient(usernameTextBox.Text, apiKeyTextBox.Text);
             SubsetController.Instance.RetroAchievementsAPIClient = RetroAchievementsAPIClient;

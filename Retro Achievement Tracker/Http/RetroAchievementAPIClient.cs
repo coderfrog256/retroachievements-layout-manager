@@ -54,9 +54,10 @@ namespace Retro_Achievement_Tracker
             }
             return JsonConvert.DeserializeObject<GameInfo>(await httpResponseMessage.Content.ReadAsStringAsync());
         }
-        public async Task<List<GameInfo>> GetRecentlyPlayedGames()
+        public async Task<List<GameInfo>> GetRecentlyPlayedGames(bool fetchMoreHistory)
         {
-            HttpResponseMessage httpResponseMessage = await client.GetAsync(string.Format(Constants.RETRO_ACHIEVEMENTS_URL + Constants.RETRO_ACHIEVEMENTS_API_GET_RECENTLY_PLAYED, UserName, ApiKey, UserName));
+            int lookback = fetchMoreHistory ? 50 : 1;
+            HttpResponseMessage httpResponseMessage = await client.GetAsync(string.Format(Constants.RETRO_ACHIEVEMENTS_URL + Constants.RETRO_ACHIEVEMENTS_API_GET_RECENTLY_PLAYED, UserName, ApiKey, UserName, lookback));
 
             if (!httpResponseMessage.IsSuccessStatusCode)
             {
