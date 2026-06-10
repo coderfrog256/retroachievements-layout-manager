@@ -36,8 +36,6 @@ namespace Retro_Achievement_Tracker
 
         private List<Achievement> OldUnlockedAchievements;
 
-        private HashSet<long> ExcludedSubsets = new HashSet<long>();
-
         private Timer UserAndGameUpdateTimer;
 
         private RetroAchievementAPIClient RetroAchievementsAPIClient;
@@ -251,7 +249,7 @@ namespace Retro_Achievement_Tracker
 
                     if (UserSummary != null && UserSummary.LastGameID > 0)
                     {
-                        List<GameInfo> previouslyPlayed = AggregatePreviouslyPlayed(await RetroAchievementsAPIClient.GetRecentlyPlayedGames());
+                        List<GameInfo> previouslyPlayed = await RetroAchievementsAPIClient.GetRecentlyPlayedGames();
 
                         if (previouslyPlayed.Count > 0)
                         {
@@ -263,17 +261,7 @@ namespace Retro_Achievement_Tracker
 
                                 UpdateActivePollingLabel(Constants.RETRO_ACHIEVEMENTS_LABEL_MSG_UPDATING_GAME_INFO);
                                 GameInfoAndProgress = await RetroAchievementsAPIClient.GetGameInfoAndProgress(previouslyPlayed[0].Id);
-
-                                if (ExcludedSubsets.Contains(GameInfoAndProgress.Id))
-                                {
-                                    // Special case. User has excluded the base set, wipe the achivement list, we'll just add the subsets.
-                                    GameInfoAndProgress.Achievements.Clear();
-                                }
-
-                                foreach (var child in previouslyPlayed[0].Children)
-                                {
-                                    await InjectChildAchievements(child, GameInfoAndProgress);
-                                }
+                                await SubsetController.Instance.HandleSubsetProgress(GameInfoAndProgress, previouslyPlayed);
 
                                 if (UpdateGameProgress(sameGame))
                                 {
@@ -316,80 +304,7 @@ namespace Retro_Achievement_Tracker
                 else
                     StopButton_Click(null, null);
             }
-        }
-
-        // Hack for weird subset behavior on some games. The RA API has fake games for subsets, but the "currently playing" is sometimes the main game.
-        // There is sometimes a "ParentGameID" returned, however not all the time (???).
-        // To work around with this ugliness, we look at the last 10 games, and associate the root game to its subsets here.
-        // This association is done via ParentGameID if present, or via dumb console+title-prefix matching.
-        // In a perfect world, the RA API would just list the subsets you've enabled in the root game. But alas.
-        private List<GameInfo> AggregatePreviouslyPlayed(List<GameInfo> previouslyPlayed)
-        {
-            List<GameInfo> newPlayed = previouslyPlayed.Where(g => g.Parent == null && !g.Title.Contains("[Subset")).ToList();
-            foreach (var game in previouslyPlayed)
-            {
-                var suffixStart = game.Title.LastIndexOf("[Subset");
-                // Match by explicit parentId
-                if (game.Parent != null)
-                {
-                    // Find if any root games in newPlayed match Parent, add to list of children. 
-                    // Otherwise add this game to newPlayed
-                    var parent = newPlayed.Find(m => m.Id == game.Parent);
-                    if (parent != null)
-                    {
-                        parent.Children.Add(game);
-                        continue;
-                    }
-                }
-                else if (suffixStart > 0)
-                {
-                    var rootName = game.Title.Substring(0, suffixStart);
-                    var parent = newPlayed.Find(m => m.Title.Trim() == rootName.Trim() && m.ConsoleId == game.ConsoleId);
-                    if (parent != null)
-                    {
-                        parent.Children.Add(game);
-                        continue;
-                    }
-                    // No match. Just add the subset and hope for the best (old behavior)
-                    newPlayed.Add(game);
-                }
-            }
-            return newPlayed;
-        }
-
-        // In order to get the achivement progress for subsets, we need to look up each child subset's psuedo-game, and push it into the root game.
-        // Probably should be in a different class, but there doesn't seem to be a "Service" layer for this app.
-        // Whatever. Just do it in the GUI layer.
-        private async Task InjectChildAchievements(GameInfo child, GameInfo progress)
-        {
-            var childProgress = await RetroAchievementsAPIClient.GetGameInfoAndProgress(child.Id);
-            if (childProgress != null)
-            {
-                // At this point the ParentGameID appears to always be populated, so we can do a real sanity check.
-                // Wouldn't want to inject achievements if the titles just happened to match...
-                if(childProgress.Parent != null && childProgress.Parent != progress.Id)
-                {
-                    //Oops. Unnecessary network call.
-                    return;
-                }
-                progress.Children.Add(childProgress);
-
-                if (ExcludedSubsets.Contains(child.Id))
-                {
-                    // User has opted out of this subset's achievements, skip them.
-                    return;
-                }
-
-                foreach (var cheevo in childProgress.Achievements)
-                {
-                    // Avoid dupes, just in case RA someday gets their shit together and bundles subsets with the root.
-                    if (progress.Achievements.Find(c=>c.Id == cheevo.Id) == null)
-                    {
-                        progress.Achievements.Add(cheevo);
-                    }
-                }
-            }
-        }
+        }   
 
         private bool UpdateGameProgress(bool sameGame)
         {
@@ -457,7 +372,7 @@ namespace Retro_Achievement_Tracker
 
                     triggeredUpdate = true;
 
-                    UpdateSubsetList();
+                    SubsetController.Instance.PopulateSubsetTable(GameInfoAndProgress, subsetLayoutTable, ForceRerender);
                 }
 
                 if (GameInfoAndProgress.Achievements != null && GameInfoAndProgress.Achievements.Count > 0 && (needsUpdate || NeedsRerender))
@@ -762,6 +677,7 @@ namespace Retro_Achievement_Tracker
             IsStarting = true;
 
             RetroAchievementsAPIClient = new RetroAchievementAPIClient(usernameTextBox.Text, apiKeyTextBox.Text);
+            SubsetController.Instance.RetroAchievementsAPIClient = RetroAchievementsAPIClient;
 
             ShouldRun = true;
 
@@ -829,6 +745,9 @@ namespace Retro_Achievement_Tracker
                 RetroAchievementsAPIClient = new RetroAchievementAPIClient(usernameTextBox.Text, apiKeyTextBox.Text);
 
                 GameInfoAndProgress = await RetroAchievementsAPIClient.GetGameInfoExtended(long.Parse(manualSearchTextBox.Text));
+
+                // Cache if this game is a subset, so it can be used later when looking at the full game.
+                SubsetController.Instance.TrackSuspectedSubset(GameInfoAndProgress);
 
                 autoPollingStatusPictureBox.Image = Resources.green_button;
                 userProfilePictureBox.ImageLocation = string.Format(Constants.RETRO_ACHIEVEMENTS_PROFILE_PIC_URL, usernameTextBox.Text);
@@ -3326,7 +3245,7 @@ namespace Retro_Achievement_Tracker
             }
         }
 
-        public async void ForceRerender()
+        public async Task ForceRerender()
         {
             UserAndGameTimerCounter = 0;
             NeedsRerender = true;
@@ -3334,106 +3253,6 @@ namespace Retro_Achievement_Tracker
             AchievementListController.Instance.UpdateAchievementList(UnlockedAchievements.ToList(), LockedAchievements.ToList(), true);
         }
 
-        private void UpdateSubsetList()
-        {
-            subsetLayoutTable.SuspendLayout();
-            while (subsetLayoutTable.Controls.Count > 0)
-            {
-                Control c = subsetLayoutTable.Controls[0];
-                subsetLayoutTable.Controls.RemoveAt(0);
-                c.Dispose();
-            }
-            subsetLayoutTable.RowStyles.Clear();
-            subsetLayoutTable.RowCount = 0;
-
-            int rowIndex = subsetLayoutTable.RowCount++;
-            subsetLayoutTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 138F)); // Constant row height
-
-            PictureBox newPicBox = new PictureBox();
-            newPicBox.Size = new Size(128, 128);
-            newPicBox.SizeMode = PictureBoxSizeMode.Zoom;
-            newPicBox.ImageLocation = GameInfoAndProgress.BadgeUri;
-            newPicBox.Anchor = AnchorStyles.Left;
-            newPicBox.Margin = new Padding(5);
-
-            Label lblText = new Label();
-            lblText.Text = "Base Set";
-            lblText.ForeColor = Color.White;
-            lblText.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            lblText.Dock = DockStyle.Fill;
-            lblText.TextAlign = ContentAlignment.MiddleLeft;
-            lblText.AutoEllipsis = true;
-            lblText.Margin = new Padding(5);
-
-            CheckBox chkStatus = new CheckBox();
-            chkStatus.Text = "Use Achievements";
-            chkStatus.ForeColor = Color.White;
-            chkStatus.Size = new Size(150, 30);
-            chkStatus.Anchor = AnchorStyles.Right;
-            chkStatus.Margin = new Padding(5);
-            chkStatus.Checked = !ExcludedSubsets.Contains(GameInfoAndProgress.Id);
-            chkStatus.CheckedChanged += (s, ev) => {
-                if (ExcludedSubsets.Contains(GameInfoAndProgress.Id))
-                {
-                    ExcludedSubsets.Remove(GameInfoAndProgress.Id);
-                }
-                else
-                {
-                    ExcludedSubsets.Add(GameInfoAndProgress.Id);
-                }
-                ForceRerender();
-            };
-
-            subsetLayoutTable.Controls.Add(newPicBox, 0, rowIndex);
-            subsetLayoutTable.Controls.Add(lblText, 1, rowIndex);
-            subsetLayoutTable.Controls.Add(chkStatus, 2, rowIndex);
-
-            foreach (var child in GameInfoAndProgress.Children)
-            {
-                rowIndex = subsetLayoutTable.RowCount++;
-                subsetLayoutTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 138F)); // Constant row height
-
-                newPicBox = new PictureBox();
-                newPicBox.Size = new Size(128, 128);
-                newPicBox.SizeMode = PictureBoxSizeMode.Zoom;
-                newPicBox.ImageLocation = child.BadgeUri;
-                newPicBox.Anchor = AnchorStyles.Left;
-                newPicBox.Margin = new Padding(5);
-
-                lblText = new Label();
-                lblText.Text = child.Title;
-                lblText.ForeColor = Color.White;
-                lblText.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-                lblText.Dock = DockStyle.Fill;
-                lblText.TextAlign = ContentAlignment.MiddleLeft;
-                lblText.AutoEllipsis = true;
-                lblText.Margin = new Padding(5);
-
-                chkStatus = new CheckBox();
-                chkStatus.Text = "Use Achievements";
-                chkStatus.ForeColor = Color.White;
-                chkStatus.Size = new Size(150, 30);
-                chkStatus.Anchor = AnchorStyles.Right;
-                chkStatus.Margin = new Padding(5);
-                chkStatus.Checked = !ExcludedSubsets.Contains(child.Id);
-                chkStatus.CheckedChanged += (s, ev) => {
-                    if (ExcludedSubsets.Contains(child.Id))
-                    {
-                        ExcludedSubsets.Remove(child.Id);
-                    }
-                    else
-                    {
-                        ExcludedSubsets.Add(child.Id);
-                    }
-                    ForceRerender();
-                };
-
-                subsetLayoutTable.Controls.Add(newPicBox, 0, rowIndex);
-                subsetLayoutTable.Controls.Add(lblText, 1, rowIndex);
-                subsetLayoutTable.Controls.Add(chkStatus, 2, rowIndex);
-            }
-            subsetLayoutTable.ResumeLayout(true);
-        }
         private void AdvancedCheckBox_Click(object sender, EventArgs e)
         {
             if (!IsChanging)

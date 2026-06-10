@@ -169,6 +169,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Controllers\AchievementListController.cs" />
+    <Compile Include="Controllers\SubsetController.cs" />
     <Compile Include="Controllers\RelatedMediaController.cs" />
     <Compile Include="Controllers\AlertsController.cs" />
     <Compile Include="Controllers\FocusController.cs" />
