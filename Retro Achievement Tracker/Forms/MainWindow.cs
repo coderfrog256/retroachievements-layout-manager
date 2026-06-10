@@ -147,6 +147,8 @@ namespace Retro_Achievement_Tracker
             Username = usernameTextBox.Text;
             WebAPIKey = apiKeyTextBox.Text;
 
+            Settings.Default.subset_exclusion = SubsetController.Instance.SaveToCsv();
+
             Settings.Default.Save();
 
             StreamLabelController.Instance.ClearAllStreamLabels();
@@ -4039,6 +4041,8 @@ namespace Retro_Achievement_Tracker
              */
             recentAchievementsAutoScrollCheckBox.Checked = RecentUnlocksController.Instance.AutoScroll;
             achievementListAutoScrollCheckBox.Checked = AchievementListController.Instance.AutoScroll;
+
+            SubsetController.Instance.RestoreFromCsv(Settings.Default.subset_exclusion);
 
             UpdateAdvancedSettings();
             UpdateAlertsEnabledControls();
