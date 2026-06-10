@@ -206,10 +206,15 @@ namespace Retro_Achievement_Tracker.Controllers
         // This API is in-development, so this is an optional step.
         private async Task TrackKnownSubsets(GameInfo rootGame)
         {
+            // Cache known associations for the session. Worst case the user can just bounce the app if a new subset's added.
+            if (_knownGameAssociations.ContainsKey(rootGame.Id))
+            {
+                return;
+            }
             try
             {
-                //TODO(FROG): Implement!
-                throw new NotImplementedException();
+                var gameInfoV2 = await RetroAchievementsAPIClient.GetV2GameInfo(rootGame.Id);
+                _knownGameAssociations.Add(rootGame.Id, gameInfoV2.SubsetIds);
             }
             catch
             {

@@ -14,6 +14,9 @@
         public static readonly string RETRO_ACHIEVEMENTS_API_GET_GAME_EXTENDED = "/API/API_GetGameExtended.php?&u={0}&y={1}&i={2}";
         public static readonly string RETRO_ACHIEVEMENTS_API_GET_RANK_AND_SCORE = "/API/API_GetUserRankAndScore.php?z={0}&y={1}&u={2}";
 
+        public static readonly string RETRO_ACHIEVEMENTS_V2_URL = "https://api.retroachievements.org";
+        public static readonly string RETRO_ACHIEVEMENTS_API_V2_GET_GAME = "/v2/games/{0}?include=achievementSets";
+
         public static readonly string RETRO_ACHIEVEMENTS_RSS_NEWS_URI = "/rss-news";
         public static readonly string RETRO_ACHIEVEMENTS_RSS_CHEEVO_URI = "/rss-newachievements";
         public static readonly string RETRO_ACHIEVEMENTS_RSS_FORUM_URI = "/rss-forum";

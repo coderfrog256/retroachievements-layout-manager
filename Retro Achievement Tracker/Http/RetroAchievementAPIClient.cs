@@ -44,6 +44,23 @@ namespace Retro_Achievement_Tracker
             }
             return JsonConvert.DeserializeObject<GameInfo>(await httpResponseMessage.Content.ReadAsStringAsync());
         }
+
+        public async Task<GameInfoV2> GetV2GameInfo(long gameId)
+        {
+            using(var request = new HttpRequestMessage(HttpMethod.Get, string.Format(Constants.RETRO_ACHIEVEMENTS_V2_URL + Constants.RETRO_ACHIEVEMENTS_API_V2_GET_GAME, gameId)))
+            {
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.api+json"));
+                request.Headers.Add("X-API-Key", ApiKey);
+
+                HttpResponseMessage httpResponseMessage = await client.SendAsync(request);
+                if (!httpResponseMessage.IsSuccessStatusCode)
+                {
+                    throw new Exception("RA backend responding with errors: " + httpResponseMessage.StatusCode);
+                }
+                return GameInfoV2Converter.FromJson(await httpResponseMessage.Content.ReadAsStringAsync());
+            }
+        }
+
         public async Task<GameInfo> GetGameInfoExtended(long gameId)
         {
             HttpResponseMessage httpResponseMessage = await client.GetAsync(string.Format(Constants.RETRO_ACHIEVEMENTS_URL + Constants.RETRO_ACHIEVEMENTS_API_GET_GAME_EXTENDED, UserName, ApiKey, gameId));
