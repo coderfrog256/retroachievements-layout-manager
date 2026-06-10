@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -15,8 +16,27 @@ namespace Retro_Achievement_Tracker.Controllers
 
         private readonly Dictionary<long, HashSet<long>> _knownGameAssociations = new Dictionary<long, HashSet<long>>(); // From v2 API, authoritative parent->child mapping.
         private readonly Dictionary<long, HashSet<long>> _suspectedGameAssociations = new Dictionary<long, HashSet<long>>(); // From v1 API, parent->child hints. May not include all subsets, children may not belong to parent.
-        //TODO(FROG): Persist this!
         private readonly Dictionary<long, bool> _excludedSubsets = new Dictionary<long, bool>();
+
+        public void RestoreFromCsv(string exclusionsCsv)
+        {
+            if(exclusionsCsv != null)
+            {
+                foreach (var exclusion in exclusionsCsv.Split(','))
+                {
+                    var gameAndIncluded = exclusion.Split('=');
+                    if (gameAndIncluded.Length > 1 && long.TryParse(gameAndIncluded[0], out var gameId) && bool.TryParse(gameAndIncluded[1], out var decision))
+                    {
+                        _excludedSubsets[gameId] = decision;
+                    }
+                }
+            }
+        }
+
+        public string SaveToCsv()
+        {
+            return string.Join(",", _excludedSubsets.Select(e => $"{e.Key}={e.Value}"));
+        }
 
         public GameInfo GetSelectedSet(GameInfo gameInfoAndProgress)
         {

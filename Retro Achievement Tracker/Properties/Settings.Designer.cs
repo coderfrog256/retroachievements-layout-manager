@@ -2884,5 +2884,21 @@ namespace Retro_Achievement_Tracker.Properties {
                 this["previously_played_game"] = value;
             }
         }
+
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string subset_exclusion
+        {
+            get
+            {
+                return ((string)(this["subset_exclusion"]));
+            }
+            set
+            {
+                this["subset_exclusion"] = value;
+            }
+        }
     }
 }
