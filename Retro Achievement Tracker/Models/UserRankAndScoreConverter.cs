@@ -25,7 +25,7 @@ namespace Retro_Achievement_Tracker.Models
             JToken Rank = item["Rank"];
             JToken Score = item["Score"];
 
-            if (Rank != null)
+            if (Rank != null && Rank.ToString().Length > 0)
             {
                 UserRankAndScore.Rank = int.Parse(Rank.ToString());
             }

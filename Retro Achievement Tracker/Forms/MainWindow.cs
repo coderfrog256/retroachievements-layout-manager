@@ -27,6 +27,7 @@ namespace Retro_Achievement_Tracker
         private int CurrentlyViewingIndex;
         private int UserAndGameTimerCounter;
         private int MaxCheevoCount = 0;
+        private bool NeedsRerender = false;
 
         private UserSummary UserSummary;
         private GameInfo GameInfoAndProgress;
@@ -34,6 +35,8 @@ namespace Retro_Achievement_Tracker
         private Achievement CurrentlyViewingAchievement;
 
         private List<Achievement> OldUnlockedAchievements;
+
+        private HashSet<long> ExcludedSubsets = new HashSet<long>();
 
         private Timer UserAndGameUpdateTimer;
 
@@ -115,7 +118,7 @@ namespace Retro_Achievement_Tracker
                 Enabled = false
             };
 
-            UserAndGameUpdateTimer.Tick += new EventHandler(UpdateFromSite);
+            UserAndGameUpdateTimer.Tick += new EventHandler((sender,e2)=>UpdateFromSite(sender,e2));
             UserAndGameUpdateTimer.Interval = 500;
 
             mainTabControl.TabIndexChanged += TabControlExtra1_TabIndexChanged;
@@ -192,7 +195,7 @@ namespace Retro_Achievement_Tracker
             }
         }
 
-        private async void UpdateFromSite(object sender, EventArgs e)
+        private async Task UpdateFromSite(object sender, EventArgs e)
         {
             if (!ShouldRun)
             {
@@ -254,12 +257,19 @@ namespace Retro_Achievement_Tracker
                         {
                             List<Achievement> recentlyUnlockedAchievements = await RetroAchievementsAPIClient.GetRecentAchievements();
 
-                            if (GameInfoAndProgress == null || !previouslyPlayed[0].Id.Equals(GameInfoAndProgress.Id) || recentlyUnlockedAchievements.Count(x => LockedAchievements.Contains(x)) > 0)
+                            if (NeedsRerender || GameInfoAndProgress == null || !previouslyPlayed[0].Id.Equals(GameInfoAndProgress.Id) || recentlyUnlockedAchievements.Count(x => LockedAchievements.Contains(x)) > 0)
                             {
                                 bool sameGame = GameInfoAndProgress != null && previouslyPlayed[0].Id.Equals(GameInfoAndProgress.Id);
 
                                 UpdateActivePollingLabel(Constants.RETRO_ACHIEVEMENTS_LABEL_MSG_UPDATING_GAME_INFO);
                                 GameInfoAndProgress = await RetroAchievementsAPIClient.GetGameInfoAndProgress(previouslyPlayed[0].Id);
+
+                                if (ExcludedSubsets.Contains(GameInfoAndProgress.Id))
+                                {
+                                    // Special case. User has excluded the base set, wipe the achivement list, we'll just add the subsets.
+                                    GameInfoAndProgress.Achievements.Clear();
+                                }
+
                                 foreach (var child in previouslyPlayed[0].Children)
                                 {
                                     await InjectChildAchievements(child, GameInfoAndProgress);
@@ -274,6 +284,7 @@ namespace Retro_Achievement_Tracker
 
                                     UpdateUserInfo();
                                 }
+                                NeedsRerender = false;
                             }
 
                             if (GameInfoAndProgress == null)
@@ -361,6 +372,13 @@ namespace Retro_Achievement_Tracker
                     //Oops. Unnecessary network call.
                     return;
                 }
+                progress.Children.Add(childProgress);
+
+                if (ExcludedSubsets.Contains(child.Id))
+                {
+                    // User has opted out of this subset's achievements, skip them.
+                    return;
+                }
 
                 foreach (var cheevo in childProgress.Achievements)
                 {
@@ -438,9 +456,11 @@ namespace Retro_Achievement_Tracker
                     RelatedMediaController.Instance.SetAllSettings(false);
 
                     triggeredUpdate = true;
+
+                    UpdateSubsetList();
                 }
 
-                if (GameInfoAndProgress.Achievements != null && GameInfoAndProgress.Achievements.Count > 0 && needsUpdate)
+                if (GameInfoAndProgress.Achievements != null && GameInfoAndProgress.Achievements.Count > 0 && (needsUpdate || NeedsRerender))
                 {
                     UpdateGameInfo();
                     UpdateCurrentlyViewingAchievement();
@@ -601,7 +621,7 @@ namespace Retro_Achievement_Tracker
                 Enabled = false
             };
 
-            UserAndGameUpdateTimer.Tick += new EventHandler(UpdateFromSite);
+            UserAndGameUpdateTimer.Tick += new EventHandler((sender, e2) => UpdateFromSite(sender, e2));
 
             UserAndGameUpdateTimer.Start();
         }
@@ -3305,6 +3325,115 @@ namespace Retro_Achievement_Tracker
                 }
             }
         }
+
+        public async void ForceRerender()
+        {
+            UserAndGameTimerCounter = 0;
+            NeedsRerender = true;
+            await UpdateFromSite(null, null);
+            AchievementListController.Instance.UpdateAchievementList(UnlockedAchievements.ToList(), LockedAchievements.ToList(), true);
+        }
+
+        private void UpdateSubsetList()
+        {
+            subsetLayoutTable.SuspendLayout();
+            while (subsetLayoutTable.Controls.Count > 0)
+            {
+                Control c = subsetLayoutTable.Controls[0];
+                subsetLayoutTable.Controls.RemoveAt(0);
+                c.Dispose();
+            }
+            subsetLayoutTable.RowStyles.Clear();
+            subsetLayoutTable.RowCount = 0;
+
+            int rowIndex = subsetLayoutTable.RowCount++;
+            subsetLayoutTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 138F)); // Constant row height
+
+            PictureBox newPicBox = new PictureBox();
+            newPicBox.Size = new Size(128, 128);
+            newPicBox.SizeMode = PictureBoxSizeMode.Zoom;
+            newPicBox.ImageLocation = GameInfoAndProgress.BadgeUri;
+            newPicBox.Anchor = AnchorStyles.Left;
+            newPicBox.Margin = new Padding(5);
+
+            Label lblText = new Label();
+            lblText.Text = "Base Set";
+            lblText.ForeColor = Color.White;
+            lblText.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            lblText.Dock = DockStyle.Fill;
+            lblText.TextAlign = ContentAlignment.MiddleLeft;
+            lblText.AutoEllipsis = true;
+            lblText.Margin = new Padding(5);
+
+            CheckBox chkStatus = new CheckBox();
+            chkStatus.Text = "Use Achievements";
+            chkStatus.ForeColor = Color.White;
+            chkStatus.Size = new Size(150, 30);
+            chkStatus.Anchor = AnchorStyles.Right;
+            chkStatus.Margin = new Padding(5);
+            chkStatus.Checked = !ExcludedSubsets.Contains(GameInfoAndProgress.Id);
+            chkStatus.CheckedChanged += (s, ev) => {
+                if (ExcludedSubsets.Contains(GameInfoAndProgress.Id))
+                {
+                    ExcludedSubsets.Remove(GameInfoAndProgress.Id);
+                }
+                else
+                {
+                    ExcludedSubsets.Add(GameInfoAndProgress.Id);
+                }
+                ForceRerender();
+            };
+
+            subsetLayoutTable.Controls.Add(newPicBox, 0, rowIndex);
+            subsetLayoutTable.Controls.Add(lblText, 1, rowIndex);
+            subsetLayoutTable.Controls.Add(chkStatus, 2, rowIndex);
+
+            foreach (var child in GameInfoAndProgress.Children)
+            {
+                rowIndex = subsetLayoutTable.RowCount++;
+                subsetLayoutTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 138F)); // Constant row height
+
+                newPicBox = new PictureBox();
+                newPicBox.Size = new Size(128, 128);
+                newPicBox.SizeMode = PictureBoxSizeMode.Zoom;
+                newPicBox.ImageLocation = child.BadgeUri;
+                newPicBox.Anchor = AnchorStyles.Left;
+                newPicBox.Margin = new Padding(5);
+
+                lblText = new Label();
+                lblText.Text = child.Title;
+                lblText.ForeColor = Color.White;
+                lblText.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+                lblText.Dock = DockStyle.Fill;
+                lblText.TextAlign = ContentAlignment.MiddleLeft;
+                lblText.AutoEllipsis = true;
+                lblText.Margin = new Padding(5);
+
+                chkStatus = new CheckBox();
+                chkStatus.Text = "Use Achievements";
+                chkStatus.ForeColor = Color.White;
+                chkStatus.Size = new Size(150, 30);
+                chkStatus.Anchor = AnchorStyles.Right;
+                chkStatus.Margin = new Padding(5);
+                chkStatus.Checked = !ExcludedSubsets.Contains(child.Id);
+                chkStatus.CheckedChanged += (s, ev) => {
+                    if (ExcludedSubsets.Contains(child.Id))
+                    {
+                        ExcludedSubsets.Remove(child.Id);
+                    }
+                    else
+                    {
+                        ExcludedSubsets.Add(child.Id);
+                    }
+                    ForceRerender();
+                };
+
+                subsetLayoutTable.Controls.Add(newPicBox, 0, rowIndex);
+                subsetLayoutTable.Controls.Add(lblText, 1, rowIndex);
+                subsetLayoutTable.Controls.Add(chkStatus, 2, rowIndex);
+            }
+            subsetLayoutTable.ResumeLayout(true);
+        }
         private void AdvancedCheckBox_Click(object sender, EventArgs e)
         {
             if (!IsChanging)
@@ -3708,7 +3837,7 @@ namespace Retro_Achievement_Tracker
             /*
              * Auto-Launch/Starting
              */
-            autoStartCheckbox.Checked = Settings.Default.auto_start_checked;
+        autoStartCheckbox.Checked = Settings.Default.auto_start_checked;
 
             focusAutoOpenWindowCheckBox.Checked = FocusController.Instance.AutoLaunch;
             alertsAutoOpenWindowCheckbox.Checked = AlertsController.Instance.AutoLaunch;
