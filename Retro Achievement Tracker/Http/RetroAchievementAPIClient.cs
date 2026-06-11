@@ -2,6 +2,7 @@
 using Retro_Achievement_Tracker.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
@@ -45,20 +46,62 @@ namespace Retro_Achievement_Tracker
             return JsonConvert.DeserializeObject<GameInfo>(await httpResponseMessage.Content.ReadAsStringAsync());
         }
 
-        public async Task<GameInfoV2> GetV2GameInfo(long gameId)
+        public async Task<List<Achievement>> GetSubsetUserSubsetAchievementsV2(long subsetId)
         {
-            using(var request = new HttpRequestMessage(HttpMethod.Get, string.Format(Constants.RETRO_ACHIEVEMENTS_V2_URL + Constants.RETRO_ACHIEVEMENTS_API_V2_GET_GAME, gameId)))
+            var result = new List<Achievement>();
+            var next = string.Format(Constants.RETRO_ACHIEVEMENTS_V2_URL + Constants.RETRO_ACHIEVEMENTS_API_V2_GET_PLAYER_SUBET_ACHIEVEMENTS, UserName, subsetId);
+            while (next != null)
             {
-                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.api+json"));
-                request.Headers.Add("X-API-Key", ApiKey);
-
-                HttpResponseMessage httpResponseMessage = await client.SendAsync(request);
-                if (!httpResponseMessage.IsSuccessStatusCode)
+                using (var request = new HttpRequestMessage(HttpMethod.Get, next))
                 {
-                    throw new Exception("RA backend responding with errors: " + httpResponseMessage.StatusCode);
+                    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.api+json"));
+                    request.Headers.Add("X-API-Key", ApiKey);
+
+                    HttpResponseMessage httpResponseMessage = await client.SendAsync(request);
+                    if (!httpResponseMessage.IsSuccessStatusCode)
+                    {
+                        throw new Exception("RA backend responding with errors: " + httpResponseMessage.StatusCode);
+                    }
+                    var (data, nextLink) = AchievementV2Converter.FromPlayerJson(await httpResponseMessage.Content.ReadAsStringAsync());
+                    result.AddRange(data);
+                    next = nextLink;
                 }
-                return GameInfoV2Converter.FromJson(await httpResponseMessage.Content.ReadAsStringAsync());
             }
+            return result;
+        }
+
+        public async Task<List<SubsetInfoV2>> GetSubsetAchievementsV2(long game)
+        {
+            var result = new Dictionary<long, SubsetInfoV2>();
+            var next = string.Format(Constants.RETRO_ACHIEVEMENTS_V2_URL + Constants.RETRO_ACHIEVEMENTS_API_V2_GET_ACHIEVEMENTS, game);
+            while (next != null)
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, next))
+                {
+                    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.api+json"));
+                    request.Headers.Add("X-API-Key", ApiKey);
+
+                    HttpResponseMessage httpResponseMessage = await client.SendAsync(request);
+                    if (!httpResponseMessage.IsSuccessStatusCode)
+                    {
+                        throw new Exception("RA backend responding with errors: " + httpResponseMessage.StatusCode);
+                    }
+                    var (data, nextLink) = AchievementV2Converter.FromAchievementJson(await httpResponseMessage.Content.ReadAsStringAsync());
+                    next = nextLink;
+                    foreach (var subset in data)
+                    {
+                        if(result.TryGetValue(subset.Key, out var existing))
+                        {
+                            existing.Achievements.AddRange(subset.Value.Achievements);
+                        }
+                        else
+                        {
+                            result[subset.Key] = subset.Value;
+                        }
+                    }
+                }
+            }
+            return result.Values.ToList();
         }
 
         public async Task<GameInfo> GetGameInfoExtended(long gameId)

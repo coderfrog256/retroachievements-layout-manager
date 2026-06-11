@@ -227,8 +227,8 @@
     </Compile>
     <Compile Include="Models\Achievement.cs" />
     <Compile Include="Models\Constants.cs" />
-    <Compile Include="Models\GameInfoV2Converter.cs" />
-    <Compile Include="Models\GameInfoV2.cs" />
+    <Compile Include="Models\AchievementV2Converter.cs" />
+    <Compile Include="Models\SubsetInfoV2.cs" />
     <Compile Include="Models\MediaHelper.cs" />
     <Compile Include="Models\AchievementConverter.cs" />
     <Compile Include="Models\GameInfo.cs" />

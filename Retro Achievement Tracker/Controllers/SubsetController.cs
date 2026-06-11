@@ -14,7 +14,6 @@ namespace Retro_Achievement_Tracker.Controllers
         private static readonly SubsetController instance = new SubsetController();
         internal RetroAchievementAPIClient RetroAchievementsAPIClient { get; set; }
 
-        private readonly Dictionary<long, HashSet<long>> _knownGameAssociations = new Dictionary<long, HashSet<long>>(); // From v2 API, authoritative parent->child mapping.
         private readonly Dictionary<long, HashSet<long>> _suspectedGameAssociations = new Dictionary<long, HashSet<long>>(); // From v1 API, parent->child hints. May not include all subsets, children may not belong to parent.
         private readonly Dictionary<long, bool> _excludedSubsets = new Dictionary<long, bool>();
 
@@ -38,10 +37,10 @@ namespace Retro_Achievement_Tracker.Controllers
             return string.Join(",", _excludedSubsets.Select(e => $"{e.Key}={e.Value}"));
         }
 
+        // If the game is excluded and only one subset is included, return that subset.
+        // Otherwise return the game.
         public GameInfo GetSelectedSet(GameInfo gameInfoAndProgress)
         {
-            // If the game is excluded and only one subset is included, return that subset.
-            // Otherwise return the game.
             if(IsGameExcluded(gameInfoAndProgress))
             {
                 var included = gameInfoAndProgress.Children
@@ -84,7 +83,6 @@ namespace Retro_Achievement_Tracker.Controllers
 
         public async Task HandleSubsetProgress(GameInfo rootGame, List<GameInfo> previouslyPlayed)
         {
-            await TrackKnownSubsets(rootGame);
             HandleUntrackedSubsets(previouslyPlayed);
             if (IsGameExcluded(rootGame))
             {
@@ -93,19 +91,18 @@ namespace Retro_Achievement_Tracker.Controllers
             }
 
             // Inject the subsets into the root game's achievment list (if not excluded).
-            // First try the known list, then guess if no known list available.
-            if (_knownGameAssociations.TryGetValue(rootGame.Id, out var children))
+            try
             {
-                foreach (var childId in children)
-                {
-                    await InjectChildAchievements(rootGame, childId);
-                }
+                await InjectChildAchievementsV2(rootGame);
             }
-            else if (_suspectedGameAssociations.TryGetValue(rootGame.Id, out children))
+            catch
             {
-                foreach (var childId in children)
+                if (_suspectedGameAssociations.TryGetValue(rootGame.Id, out var v1Children))
                 {
-                    await InjectChildAchievements(rootGame, childId);
+                    foreach (var childId in v1Children)
+                    {
+                        await InjectChildAchievementsV1(rootGame, childId);
+                    }
                 }
             }
         }
@@ -222,28 +219,8 @@ namespace Retro_Achievement_Tracker.Controllers
             }
         }
 
-        // Try to invoke the v2 API to get a known list of subsets for this game.
-        // This API is in-development, so this is an optional step.
-        private async Task TrackKnownSubsets(GameInfo rootGame)
-        {
-            // Cache known associations for the session. Worst case the user can just bounce the app if a new subset's added.
-            if (_knownGameAssociations.ContainsKey(rootGame.Id))
-            {
-                return;
-            }
-            try
-            {
-                var gameInfoV2 = await RetroAchievementsAPIClient.GetV2GameInfo(rootGame.Id);
-                _knownGameAssociations.Add(rootGame.Id, gameInfoV2.SubsetIds);
-            }
-            catch
-            {
-                // Intentionally empty, v2 lookups are not mandatory and the API may have changed in an incompatible way.
-            }
-        }
-
         // In order to get the achivement progress for subsets, we need to look up each child subset's psuedo-game, and push it into the root game.
-        private async Task InjectChildAchievements(GameInfo rootGame, long childId)
+        private async Task InjectChildAchievementsV1(GameInfo rootGame, long childId)
         {
             var childProgress = await RetroAchievementsAPIClient.GetGameInfoAndProgress(childId);
             if (childProgress != null)
@@ -265,6 +242,39 @@ namespace Retro_Achievement_Tracker.Controllers
                 foreach (var cheevo in childProgress.Achievements)
                 {
                     // Avoid dupes, just in case RA someday bundles subsets with the root.
+                    if (rootGame.Achievements.Find(c => c.Id == cheevo.Id) == null)
+                    {
+                        rootGame.Achievements.Add(cheevo);
+                    }
+                }
+            }
+        }
+
+
+        // The V2 API returns a flat list of root and subset achievements.
+        // Call the API, group achievements by subset, and look up the user-progress for enabled ones.
+        private async Task InjectChildAchievementsV2(GameInfo rootGame)
+        {
+            var subsets = await RetroAchievementsAPIClient.GetSubsetAchievementsV2(rootGame.Id);
+            foreach (var subset in subsets)
+            {
+                subset.AddToParent(rootGame);
+                if (IsGameExcluded(subset))
+                {
+                    continue;
+                }
+                foreach (var cheevo in await RetroAchievementsAPIClient.GetSubsetUserSubsetAchievementsV2(subset.Id))
+                {
+                    // Avoid dupes, just in case RA someday bundles subsets with the root.
+                    if (rootGame.Achievements.Find(c => c.Id == cheevo.Id) == null)
+                    {
+                        rootGame.Achievements.Add(cheevo);
+                    }
+                }
+
+                foreach (var cheevo in subset.Achievements)
+                {
+                    // Only add the subset's user-agnostic achievement if we haven't already added an earned one above.
                     if (rootGame.Achievements.Find(c => c.Id == cheevo.Id) == null)
                     {
                         rootGame.Achievements.Add(cheevo);
