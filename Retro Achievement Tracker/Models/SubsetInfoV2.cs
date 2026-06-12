@@ -6,7 +6,8 @@ namespace Retro_Achievement_Tracker.Models
     // Subset from the V2 game API. Mascarades as a GameInfo for Back-Compat with flows that use V1 data.
     public class SubsetInfoV2 : GameInfo
     {
-        public void AddToParent(GameInfo parent)
+        // Copies down game-specific data, as v2's subsets (correctly) do not have them.
+        public void CopyFromParent(GameInfo parent)
         {
             Parent = parent.Id;
             ConsoleId = parent.ConsoleId;
@@ -19,7 +20,6 @@ namespace Retro_Achievement_Tracker.Models
             Released = parent.Released;
             ConsoleName = parent.ConsoleName;
             LastPlayed = parent.LastPlayed;
-            parent.Children.Add(this);
         }
     }
 }
