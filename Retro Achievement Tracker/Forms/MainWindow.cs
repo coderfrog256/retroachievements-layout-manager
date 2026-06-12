@@ -592,7 +592,7 @@ namespace Retro_Achievement_Tracker
 
             StreamLabelController.Instance.EnqueueGameProgress(GameInfoAndProgress);
 
-            StreamLabelController.Instance.EnqueueGameInfo(GameInfoAndProgress);
+            StreamLabelController.Instance.EnqueueGameInfo(setInfo);
 
             int percentageCompleted = (int)float.Parse(GameInfoAndProgress.PercentComplete);
 
@@ -3666,7 +3666,7 @@ namespace Retro_Achievement_Tracker
             /*
              * Auto-Launch/Starting
              */
-        autoStartCheckbox.Checked = Settings.Default.auto_start_checked;
+            autoStartCheckbox.Checked = Settings.Default.auto_start_checked;
 
             focusAutoOpenWindowCheckBox.Checked = FocusController.Instance.AutoLaunch;
             alertsAutoOpenWindowCheckbox.Checked = AlertsController.Instance.AutoLaunch;

@@ -46,7 +46,7 @@ namespace Retro_Achievement_Tracker
             return JsonConvert.DeserializeObject<GameInfo>(await httpResponseMessage.Content.ReadAsStringAsync());
         }
 
-        public async Task<List<Achievement>> GetSubsetUserSubsetAchievementsV2(long subsetId)
+        public async Task<List<Achievement>> GetUserSubsetAchievementsV2(long subsetId)
         {
             var result = new List<Achievement>();
             var next = string.Format(Constants.RETRO_ACHIEVEMENTS_V2_URL + Constants.RETRO_ACHIEVEMENTS_API_V2_GET_PLAYER_SUBET_ACHIEVEMENTS, UserName, subsetId);

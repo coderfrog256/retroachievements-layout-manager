@@ -274,8 +274,8 @@ namespace Retro_Achievement_Tracker.Controllers
             }
         }
 
-        // The V2 API returns a flat list of root and subset achievements.
-        // Call the API, group achievements by subset, and look up the user-progress for enabled ones.
+        // Add the subset to the game's list of children. If enabled, check the user's progress in this subset
+        // Lastly add the user's unlocked achievements, and the user-agnostic locked achievements to the root game.
         private async Task InjectChildAchievementsV2(GameInfo rootGame, SubsetInfoV2 subset)
         {
             rootGame.Children.Add(subset);
@@ -283,7 +283,7 @@ namespace Retro_Achievement_Tracker.Controllers
             {
                 return;
             }
-            foreach (var cheevo in await RetroAchievementsAPIClient.GetSubsetUserSubsetAchievementsV2(subset.Id))
+            foreach (var cheevo in await RetroAchievementsAPIClient.GetUserSubsetAchievementsV2(subset.Id))
             {
                 // Avoid dupes, just in case RA someday bundles subsets with the root.
                 if (rootGame.Achievements.Find(c => c.Id == cheevo.Id) == null)
