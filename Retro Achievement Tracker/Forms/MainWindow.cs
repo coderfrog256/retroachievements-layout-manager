@@ -27,7 +27,7 @@ namespace Retro_Achievement_Tracker
         private int CurrentlyViewingIndex;
         private int UserAndGameTimerCounter;
         private int MaxCheevoCount = 0;
-        private bool NeedsRerender = false;
+        private bool SubsetsReloading = false;
         private bool FetchMoreHistory = true;
 
         private UserSummary UserSummary;
@@ -259,7 +259,7 @@ namespace Retro_Achievement_Tracker
                         {
                             List<Achievement> recentlyUnlockedAchievements = await RetroAchievementsAPIClient.GetRecentAchievements();
 
-                            if (NeedsRerender || GameInfoAndProgress == null || !previouslyPlayed[0].Id.Equals(GameInfoAndProgress.Id)
+                            if (SubsetsReloading || GameInfoAndProgress == null || !previouslyPlayed[0].Id.Equals(GameInfoAndProgress.Id)
                                 || SubsetController.Instance.HandleUntrackedSubsets(previouslyPlayed)
                                 || recentlyUnlockedAchievements.Count(x => LockedAchievements.Contains(x)) > 0)
                             {
@@ -278,7 +278,7 @@ namespace Retro_Achievement_Tracker
 
                                     UpdateUserInfo();
                                 }
-                                NeedsRerender = false;
+                                SubsetsReloading = false;
                             }
 
                             if (GameInfoAndProgress == null)
@@ -333,31 +333,32 @@ namespace Retro_Achievement_Tracker
                                                                     .FindAll(unlockedAchievement => !OldUnlockedAchievements.Contains(unlockedAchievement))
                                                                     .ToList();
 
-                    achievementNotificationList.ForEach((achievement) => StreamLabelController.Instance.EnqueueAlert(achievement));
-
-                    if (achievementNotificationList.Count > 0 && UnlockedAchievements.Count > MaxCheevoCount)
+                    if (SubsetsReloading || achievementNotificationList.Count > 0 && UnlockedAchievements.Count > MaxCheevoCount)
                     {
                         MaxCheevoCount = UnlockedAchievements.Count;
 
-                        UpdateActivePollingLabel(Constants.RETRO_ACHIEVEMENTS_LABEL_MSG_CHEEVO_POP);
-
-                        achievementNotificationList.Sort();
-
-                        if (AlertsController.Instance.AchievementAlertEnable)
+                        if (!SubsetsReloading)
                         {
-                            triggeredUpdate = true;
-                            AlertsController.Instance.EnqueueAchievementNotifications(achievementNotificationList);
+                            achievementNotificationList.Sort();
+                            achievementNotificationList.ForEach((achievement) => StreamLabelController.Instance.EnqueueAlert(achievement));
+                            UpdateActivePollingLabel(Constants.RETRO_ACHIEVEMENTS_LABEL_MSG_CHEEVO_POP);
+
+                            if (AlertsController.Instance.AchievementAlertEnable)
+                            {
+                                triggeredUpdate = true;
+                                AlertsController.Instance.EnqueueAchievementNotifications(achievementNotificationList);
+                            }
+
+                            if (AlertsController.Instance.MasteryAlertEnable && UnlockedAchievements.Count == GameInfoAndProgress.Achievements.Count && OldUnlockedAchievements.Count < GameInfoAndProgress.Achievements.Count)
+                            {
+                                AlertsController.Instance.EnqueueMasteryNotification(GameInfoAndProgress);
+                                StreamLabelController.Instance.EnqueueAlert(GameInfoAndProgress);
+                            }
                         }
 
                         if (achievementNotificationList.Contains(FocusController.Instance.CurrentlyFocusedAchievement) || achievementNotificationList.Contains(CurrentlyViewingAchievement))
                             if (LockedAchievements.Count > 0)
                                 FindNewFocus();
-
-                        if (AlertsController.Instance.MasteryAlertEnable && UnlockedAchievements.Count == GameInfoAndProgress.Achievements.Count && OldUnlockedAchievements.Count < GameInfoAndProgress.Achievements.Count)
-                        {
-                            AlertsController.Instance.EnqueueMasteryNotification(GameInfoAndProgress);
-                            StreamLabelController.Instance.EnqueueAlert(GameInfoAndProgress);
-                        }
 
                         needsUpdate = true;
                     }
@@ -378,11 +379,11 @@ namespace Retro_Achievement_Tracker
 
                     triggeredUpdate = true;
 
-                    SubsetController.Instance.PopulateSubsetTable(GameInfoAndProgress, subsetLayoutTable, ForceRerender);
+                    SubsetController.Instance.PopulateSubsetTable(GameInfoAndProgress, subsetLayoutTable, ReloadSubsets);
                     FetchMoreHistory = true;
                 }
 
-                if (GameInfoAndProgress.Achievements != null && GameInfoAndProgress.Achievements.Count > 0 && (needsUpdate || NeedsRerender))
+                if (GameInfoAndProgress.Achievements != null && GameInfoAndProgress.Achievements.Count > 0 && needsUpdate)
                 {
                     UpdateGameInfo();
                     UpdateCurrentlyViewingAchievement();
@@ -3254,10 +3255,10 @@ namespace Retro_Achievement_Tracker
             }
         }
 
-        public async Task ForceRerender()
+        public async Task ReloadSubsets()
         {
             UserAndGameTimerCounter = 0;
-            NeedsRerender = true;
+            SubsetsReloading = true;
             await UpdateFromSite(null, null);
             AchievementListController.Instance.UpdateAchievementList(UnlockedAchievements.ToList(), LockedAchievements.ToList(), true);
         }
