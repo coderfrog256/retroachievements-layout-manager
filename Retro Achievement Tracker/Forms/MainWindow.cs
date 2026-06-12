@@ -27,6 +27,7 @@ namespace Retro_Achievement_Tracker
         private int CurrentlyViewingIndex;
         private int UserAndGameTimerCounter;
         private int MaxCheevoCount = 0;
+        private bool CurrentlyQueryingAPI = false;
         private bool SubsetsReloading = false;
         private bool FetchMoreHistory = true;
 
@@ -198,7 +199,7 @@ namespace Retro_Achievement_Tracker
 
         private async Task UpdateFromSite(object sender, EventArgs e)
         {
-            if (!ShouldRun)
+            if (!ShouldRun || CurrentlyQueryingAPI)
             {
                 UserAndGameUpdateTimer.Stop();
 
@@ -238,6 +239,7 @@ namespace Retro_Achievement_Tracker
 
             try
             {
+                CurrentlyQueryingAPI = true;
                 if (UserAndGameTimerCounter <= 0)
                 {
                     UserAndGameUpdateTimer.Stop();
@@ -259,8 +261,8 @@ namespace Retro_Achievement_Tracker
                         {
                             List<Achievement> recentlyUnlockedAchievements = await RetroAchievementsAPIClient.GetRecentAchievements();
 
-                            if (SubsetsReloading || GameInfoAndProgress == null || !previouslyPlayed[0].Id.Equals(GameInfoAndProgress.Id)
-                                || SubsetController.Instance.HandleUntrackedSubsets(previouslyPlayed)
+                            if (SubsetController.Instance.HandleUntrackedSubsets(previouslyPlayed)
+                                || SubsetsReloading || GameInfoAndProgress == null || !previouslyPlayed[0].Id.Equals(GameInfoAndProgress.Id)
                                 || recentlyUnlockedAchievements.Count(x => LockedAchievements.Contains(x)) > 0)
                             {
                                 bool sameGame = GameInfoAndProgress != null && previouslyPlayed[0].Id.Equals(GameInfoAndProgress.Id);
@@ -278,7 +280,6 @@ namespace Retro_Achievement_Tracker
 
                                     UpdateUserInfo();
                                 }
-                                SubsetsReloading = false;
                             }
 
                             if (GameInfoAndProgress == null)
@@ -309,6 +310,11 @@ namespace Retro_Achievement_Tracker
                     StartTimer();
                 else
                     StopButton_Click(null, null);
+            }
+            finally
+            {
+                CurrentlyQueryingAPI = false;
+                SubsetsReloading = false;
             }
         }   
 
@@ -3261,6 +3267,9 @@ namespace Retro_Achievement_Tracker
             SubsetsReloading = true;
             await UpdateFromSite(null, null);
             AchievementListController.Instance.UpdateAchievementList(UnlockedAchievements.ToList(), LockedAchievements.ToList(), true);
+
+            Settings.Default.subset_exclusion = SubsetController.Instance.SaveToCsv();
+            Settings.Default.Save();
         }
 
         private void AdvancedCheckBox_Click(object sender, EventArgs e)

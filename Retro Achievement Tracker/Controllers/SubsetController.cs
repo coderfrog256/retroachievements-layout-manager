@@ -49,7 +49,9 @@ namespace Retro_Achievement_Tracker.Controllers
                     .ToList();
                 if(included.Count == 1)
                 {
-                    return included[0];
+                    // Cascade the user's unlocked achievements down to the child
+                    // It may be anonymous (all locked) if it came from the V2 API.
+                    return included[0].CopyWithUserAchievements(gameInfoAndProgress.Achievements);
                 }
             }
             return gameInfoAndProgress;
@@ -85,27 +87,50 @@ namespace Retro_Achievement_Tracker.Controllers
         public async Task HandleSubsetProgress(GameInfo rootGame, List<GameInfo> previouslyPlayed)
         {
             await TrackKnownSubsets(rootGame);
-            HandleUntrackedSubsets(previouslyPlayed);
+            var oldRootAchievements = rootGame.Achievements.ToList();
             if (IsGameExcluded(rootGame))
             {
                 // Special case. User has excluded the base set, wipe the achivement list, we'll just add the subsets.
                 rootGame.Achievements.Clear();
             }
 
-            // Inject the subsets into the root game's achievment list (if not excluded).
-            // First try the known list, then guess if no known list available.
-            if (_knownGameSubsets.TryGetValue(rootGame.Id, out var subsets))
+            try
             {
-                foreach (var subset in subsets)
+                // Inject the subsets into the root game's achievment list (if not excluded).
+                // First try the known list, then guess if no known list available.
+                if (_knownGameSubsets.TryGetValue(rootGame.Id, out var subsets))
                 {
-                    await InjectChildAchievementsV2(rootGame, subset);
+                    try
+                    {
+                        foreach (var subset in subsets)
+                        {
+                            await InjectChildAchievementsV2(rootGame, subset);
+                        }
+                        return;
+                    }
+                    catch
+                    {
+
+                    }
+                }
+                // V2 not available, or has failed. Fall back to V1.
+                if (_suspectedGameAssociations.TryGetValue(rootGame.Id, out var children))
+                {
+                    foreach (var childId in children)
+                    {
+                        await InjectChildAchievementsV1(rootGame, childId);
+                    }
                 }
             }
-            else if (_suspectedGameAssociations.TryGetValue(rootGame.Id, out var children))
+            finally
             {
-                foreach (var childId in children)
+                // Edge case. If the user persisted an exclusion for the root game, but the subset tracked has been delisted
+                // We need to readd the achievements and remove the exclusion
+                // In normal operation this is handled by disabling the checkbox, but it won't work if it's delisted RA-side.
+                if(rootGame.Achievements.Count == 0)
                 {
-                    await InjectChildAchievementsV1(rootGame, childId);
+                    rootGame.Achievements.AddRange(oldRootAchievements);
+                    _excludedSubsets.Remove(rootGame.Id);
                 }
             }
         }

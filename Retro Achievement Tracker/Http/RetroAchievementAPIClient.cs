@@ -49,7 +49,7 @@ namespace Retro_Achievement_Tracker
         public async Task<List<Achievement>> GetUserSubsetAchievementsV2(long subsetId)
         {
             var result = new List<Achievement>();
-            var next = string.Format(Constants.RETRO_ACHIEVEMENTS_V2_URL + Constants.RETRO_ACHIEVEMENTS_API_V2_GET_PLAYER_SUBET_ACHIEVEMENTS, UserName, subsetId);
+            var next = string.Format(Constants.RETRO_ACHIEVEMENTS_V2_URL + Constants.RETRO_ACHIEVEMENTS_API_V2_GET_PLAYER_SUSBET_ACHIEVEMENTS, UserName, subsetId);
             while (next != null)
             {
                 using (var request = new HttpRequestMessage(HttpMethod.Get, next))

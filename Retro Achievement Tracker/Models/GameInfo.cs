@@ -192,6 +192,14 @@ namespace Retro_Achievement_Tracker.Models
         public string ConsoleName { get; set; }
         public readonly List<Claim> Claims = new List<Claim>();
         public List<Achievement> Achievements { get; set; }
+
+        public GameInfo CopyWithUserAchievements(List<Achievement> achievements)
+        {
+            var copy = (GameInfo)MemberwiseClone();
+            copy.Achievements = achievements;
+            return copy;
+        }
+
         public int AchievementsEarned
         {
             get

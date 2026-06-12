@@ -16,7 +16,7 @@
 
         public static readonly string RETRO_ACHIEVEMENTS_V2_URL = "https://api.retroachievements.org";
         public static readonly string RETRO_ACHIEVEMENTS_API_V2_GET_ACHIEVEMENTS = "/v2/achievements?filter[gameId]={0}&include=achievementSet&page[size]=100";
-        public static readonly string RETRO_ACHIEVEMENTS_API_V2_GET_PLAYER_SUBET_ACHIEVEMENTS = "/v2/users/{0}/player-achievements?filter[achievementSetId]={1}&include=achievement&page[size]=100";
+        public static readonly string RETRO_ACHIEVEMENTS_API_V2_GET_PLAYER_SUSBET_ACHIEVEMENTS = "/v2/users/{0}/player-achievements?filter[achievementSetId]={1}&include=achievement&page[size]=100";
 
         public static readonly string RETRO_ACHIEVEMENTS_RSS_NEWS_URI = "/rss-news";
         public static readonly string RETRO_ACHIEVEMENTS_RSS_CHEEVO_URI = "/rss-newachievements";

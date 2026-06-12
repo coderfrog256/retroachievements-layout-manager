@@ -27,16 +27,13 @@
                 }
             }
 
-            string next = null;
-            var nextToken = root["links"]["next"];
-            if (nextToken != null)
-            {
-                next = (string)nextToken;
-            }
-
+            string next = (string)root.SelectToken("links.next");
             return (achievements.Values.ToList(), next);
         }
 
+        // NOTE: This implementation is specific to SUBsets. The V2 API returns both the core set and subsets
+        // If you ever switch fully from V1 to the V2 API,  the filter for core sets (title == null, type=core) should be dropped
+        // (You'll also want to rename "SubsetInfoV2" to something like "AchievementSetInfo")
         public static (Dictionary<long, SubsetInfoV2>, string) FromAchievementJson(string json)
         {
             var root = JObject.Parse(json);
@@ -54,20 +51,14 @@
                 foreach (var row in data.Where(row => "achievements" == (string)row["type"]))
                 {
                     var (subsetId, achievement) = ParseAchievement(row, false);
-                    if (subsets.TryGetValue(subsetId.Value, out var subset))
+                    if (subsetId != null && subsets.TryGetValue(subsetId.Value, out var subset))
                     {
                         subset.Achievements.Add(achievement);
                     }
                 }
             }
 
-            string next = null;
-            var nextToken = root["links"]["next"];
-            if (nextToken != null)
-            {
-                next = (string)nextToken;
-            }
-
+            string next = (string)root.SelectToken("links.next");
             return (subsets, next);
         }
 
@@ -90,8 +81,8 @@
         private static void AddPlayerData(JToken row, Dictionary<int, Achievement> achievements)
         {
             var id = int.Parse((string)row["relationships"]["achievement"]["data"]["id"]);
-            var achievement = achievements[id];
-            if (row["attributes"]["unlockedHardcoreAt"] is JToken date)
+            if (achievements.TryGetValue(id, out var achievement)
+                && row["attributes"]["unlockedHardcoreAt"] is JToken date && date.Type != JTokenType.Null)
             {
                 achievement.DateEarned = DateTime.Parse((string)date);
             }
