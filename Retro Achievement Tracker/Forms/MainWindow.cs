@@ -254,7 +254,7 @@ namespace Retro_Achievement_Tracker
 
                     if (UserSummary != null && UserSummary.LastGameID > 0)
                     {
-                        List<GameInfo> previouslyPlayed = await RetroAchievementsAPIClient.GetRecentlyPlayedGames(FetchMoreHistory);
+                        List<GameInfo> previouslyPlayed = SubsetController.Instance.AvoidGameFlap(await RetroAchievementsAPIClient.GetRecentlyPlayedGames(FetchMoreHistory), GameInfoAndProgress);
                         FetchMoreHistory = false;
 
                         if (previouslyPlayed.Count > 0)

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -12,8 +13,8 @@ namespace Retro_Achievement_Tracker.Controllers
     public sealed class SubsetController
     {
         private static readonly SubsetController instance = new SubsetController();
+        private static readonly Regex SubsetNameRegex = new Regex(@"\[Subset\s*-\s*(?<subset>[^\]]+)\]",RegexOptions.Compiled);
         internal RetroAchievementAPIClient RetroAchievementsAPIClient { get; set; }
-
         private readonly Dictionary<long, List<SubsetInfoV2>> _knownGameSubsets = new Dictionary<long, List<SubsetInfoV2>>(); // From v2 API, authoritative parent->child mapping.
         private readonly Dictionary<long, HashSet<long>> _suspectedGameAssociations = new Dictionary<long, HashSet<long>>(); // From v1 API, parent->child hints. May not include all subsets, children may not belong to parent.
         private readonly Dictionary<long, bool> _excludedSubsets = new Dictionary<long, bool>();
@@ -56,6 +57,45 @@ namespace Retro_Achievement_Tracker.Controllers
             }
             return gameInfoAndProgress;
         }
+
+        // The V1 RA API has a "fun" behavior where getting an achievement from a subset will momentarily change your active game to the subset.
+        // Maybe this is for history tracking?
+        // Regardless, it breaks the flow as the core game with its subsets is replaced by only the subset for a few minutes before flipping back.
+        // Avoid flapping the active game by checking if the 0th game is a subset of the current one. Return the current game first if this happens.
+        public List<GameInfo> AvoidGameFlap(List<GameInfo> gameInfos, GameInfo currentGame)
+        {
+            if (gameInfos.Count > 0)
+            {
+                var latestGame = gameInfos[0];
+                var subsetName = SubsetNameRegex.Match(latestGame.Title);
+                if(subsetName.Success)
+                {
+                    // User has a subset as their most recent game. Check for if the currentGame being played has it as a child,
+                    // to avoid flapping.
+                    if (currentGame != null && currentGame.Children.Where(c => c.Title.Trim() == subsetName.Groups["subset"].Value).Any())
+                    {
+                        gameInfos.Insert(0, currentGame);
+                    }
+                    // If there is no first game, maybe they're launching after a subset is the newest.
+                    // Try to find a match in the history
+                    else if (currentGame == null)
+                    {
+                        var suffixStart = latestGame.Title.LastIndexOf("[Subset");
+                        var rootName = latestGame.Title.Substring(0, suffixStart).Trim();
+                        var rootIndex = gameInfos.FindIndex(g => g.Title.Trim() == rootName);
+                        if(rootIndex > 0)
+                        {
+                            // Weird C# incantation to swap list elements by index
+                            // Move the root game to the 0th position, swap the subset to where the root is.
+                            (gameInfos[0], gameInfos[rootIndex]) = (gameInfos[rootIndex], gameInfos[0]);
+                        }
+                    }
+                }
+            }
+            // Not a subset, or no reasonable fallback, just leave it as-is.
+            return gameInfos;
+        }
+
 
         // The v1 API has no indicator for if a game has subsets.
         // To work around this, we look at the game history, and associate the root game to possible subsets.
