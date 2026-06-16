@@ -52,7 +52,7 @@ namespace Retro_Achievement_Tracker.Controllers
                 {
                     // Cascade the user's unlocked achievements down to the child
                     // It may be anonymous (all locked) if it came from the V2 API.
-                    return included[0].CopyWithUserAchievements(gameInfoAndProgress.Achievements);
+                    return included[0].CopyWithUserAchievements(gameInfoAndProgress);
                 }
             }
             return gameInfoAndProgress;
@@ -78,7 +78,7 @@ namespace Retro_Achievement_Tracker.Controllers
                     }
                     // If there is no first game, maybe they're launching after a subset is the newest.
                     // Try to find a match in the history
-                    else if (currentGame == null)
+                    else if(currentGame == null)
                     {
                         var suffixStart = latestGame.Title.LastIndexOf("[Subset");
                         var rootName = latestGame.Title.Substring(0, suffixStart).Trim();

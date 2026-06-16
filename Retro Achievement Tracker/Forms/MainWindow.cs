@@ -651,10 +651,10 @@ namespace Retro_Achievement_Tracker
 
             File.WriteAllText(@Directory.GetCurrentDirectory() + "/game-progress/" + GameInfoAndProgress.Id + ".json", JsonConvert.SerializeObject(achievementUnlocks));
 
-            RelatedMediaController.Instance.RABadgeIconURI = GameInfoAndProgress.BadgeUri;
-            RelatedMediaController.Instance.RATitleScreenURI = GameInfoAndProgress.ImageTitle;
-            RelatedMediaController.Instance.RAScreenshotURI = GameInfoAndProgress.ImageIngame;
-            RelatedMediaController.Instance.RABoxArtURI = GameInfoAndProgress.ImageBoxArt;
+            RelatedMediaController.Instance.RABadgeIconURI = setInfo.BadgeUri;
+            RelatedMediaController.Instance.RATitleScreenURI = setInfo.ImageTitle;
+            RelatedMediaController.Instance.RAScreenshotURI = setInfo.ImageIngame;
+            RelatedMediaController.Instance.RABoxArtURI = setInfo.ImageBoxArt;
 
             RelatedMediaController.Instance.UpdateImage(false);
         }

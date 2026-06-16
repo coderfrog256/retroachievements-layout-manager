@@ -114,7 +114,7 @@ namespace Retro_Achievement_Tracker.Controllers
                         break;
                 }
 
-                if (CurrentImageURI == null || forceUpdate || !CurrentImageURI.Equals(imageUri))
+                if (imageUri != null && (CurrentImageURI == null || forceUpdate || !CurrentImageURI.Equals(imageUri)))
                 {
                     RelatedMediaWindow.HideImage();
 

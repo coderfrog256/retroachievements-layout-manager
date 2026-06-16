@@ -21,5 +21,13 @@ namespace Retro_Achievement_Tracker.Models
             ConsoleName = parent.ConsoleName;
             LastPlayed = parent.LastPlayed;
         }
+
+        public override GameInfo CopyWithUserAchievements(GameInfo parent)
+        {
+            var copy = (GameInfo)MemberwiseClone();
+            copy.Achievements = parent.Achievements;
+            copy.Title = parent.Title + " - " + Title;
+            return copy;
+        }
     }
 }

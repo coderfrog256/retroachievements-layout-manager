@@ -193,10 +193,10 @@ namespace Retro_Achievement_Tracker.Models
         public readonly List<Claim> Claims = new List<Claim>();
         public List<Achievement> Achievements { get; set; }
 
-        public GameInfo CopyWithUserAchievements(List<Achievement> achievements)
+        public virtual GameInfo CopyWithUserAchievements(GameInfo parent)
         {
             var copy = (GameInfo)MemberwiseClone();
-            copy.Achievements = achievements;
+            copy.Achievements = parent.Achievements;
             return copy;
         }
 
