@@ -172,6 +172,18 @@ namespace Retro_Achievement_Tracker.Controllers
                     rootGame.Achievements.AddRange(oldRootAchievements);
                     _excludedSubsets.Remove(rootGame.Id);
                 }
+                
+                // We need to sort achievements, as we are intermixing (possibly multiple) subsets, and the core game.
+                // The MainWindow has an index of the focused game, and it cannot jump around between resyncs/unlocks.
+                if (rootGame.Children.Count > 0)
+                {
+                    rootGame.Achievements.Sort((l, r) =>
+                    {
+                        // First try to sort by the explicit ordering. Use ids as a tie-breaker.
+                        int orderComparison = l.DisplayOrder.CompareTo(r.DisplayOrder);
+                        return orderComparison == 0 ? l.Id.CompareTo(r.Id) : orderComparison;
+                    });
+                }
             }
         }
 

@@ -362,7 +362,7 @@ namespace Retro_Achievement_Tracker
                             }
                         }
 
-                        if (achievementNotificationList.Contains(FocusController.Instance.CurrentlyFocusedAchievement) || achievementNotificationList.Contains(CurrentlyViewingAchievement))
+                        if (SubsetsReloading || achievementNotificationList.Contains(FocusController.Instance.CurrentlyFocusedAchievement) || achievementNotificationList.Contains(CurrentlyViewingAchievement))
                             if (LockedAchievements.Count > 0)
                                 FindNewFocus();
 
@@ -418,6 +418,11 @@ namespace Retro_Achievement_Tracker
         private void FindNewFocus()
         {
             int currentIndex = GameInfoAndProgress.Achievements.IndexOf(FocusController.Instance.CurrentlyFocusedAchievement);
+            // Reloading subsets may remove the tracked achievement. Default to the first one if this happens.
+            if(currentIndex == -1)
+            {
+                currentIndex = 0;
+            }
 
             switch (FocusController.Instance.RefocusBehavior)
             {
